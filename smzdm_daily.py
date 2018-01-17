@@ -1,13 +1,15 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
+import os
 import json
 import sys
 import requests
 import re
 
-SMZDM_USERNAME = '' # username or email
-SMZDM_PASSWORD = '' # password
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+SMZDM_USERNAME = os.getenv('SMZDM_DAILY_USERNAME') or 'SMZDM_USERNAME' # username or email
+SMZDM_PASSWORD = os.getenv('SMZDM_DAILY_PASSWORD') or 'SMZDM_PASSWORD' # password
 
 class SMZDMDailyException(Exception):
     def __init__(self, req):
@@ -17,7 +19,7 @@ class SMZDMDailyException(Exception):
         return str(self.req)
 
 class SMZDMDaily(object):
-    BASE_URL = 'http://zhiyou.smzdm.com'
+    BASE_URL = 'https://zhiyou.smzdm.com'
     LOGIN_URL = BASE_URL + '/user/login/ajax_check'
     CHECKIN_URL = BASE_URL + '/user/checkin/jsonp_checkin'
 
@@ -29,7 +31,8 @@ class SMZDMDaily(object):
     def checkin(self):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; rv:20.0) Gecko/20100101 Firefox/20.0',
-            'Host': 'zhiyou.smzdm.com'
+            'Host': 'zhiyou.smzdm.com',
+            'Referer': 'https://www.smzdm.com/'
         }
 
         params = {
@@ -38,8 +41,30 @@ class SMZDMDaily(object):
         }
 
         r = self.session.get(self.BASE_URL, headers=headers, verify=False)
+
+        ############ login ###################################################################
         r = self.session.post(self.LOGIN_URL, data=params, headers=headers, verify=False)
+        jdata = json.loads(r.text)
+        if 'error_code' in jdata:
+            err_code = jdata['error_code']
+            if err_code !=0:
+                print "login return error_code:",err_code
+                sys.exit(0)
+        else:
+            print "login post return without error_code!", jdata
+            sys.exit(0)
+
+        ############ checkin ###################################################################
         r = self.session.get(self.CHECKIN_URL, headers=headers, verify=False)
+        jdata = json.loads(r.text)
+        if 'error_code' in jdata:
+            err_code = jdata['error_code']
+            if err_code !=0:
+                print "checkin return error_code:",jdata
+                sys.exit(0)
+        else:
+            print "checkin return without error_code!", jdata
+            sys.exit(0)
         if r.status_code != 200:
             raise SMZDMDailyException(r)
 
@@ -60,5 +85,5 @@ if __name__ == '__main__':
     except Exception as e:
         print('fail', e)
     else:
-        print('success', result)
-
+        #print('success', result)
+        pass
